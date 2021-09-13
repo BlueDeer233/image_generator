@@ -17,11 +17,10 @@
 
 ## 鸣谢
 
-感谢 [Diving-Fish](https://github.com/Diving-Fish) 提供的源码支持
-感谢 [pcrbot](https://github.com/pcrbot) 提供的源码支持
+  感谢 [Diving-Fish](https://github.com/Diving-Fish) 提供的源码支持
+  感谢 [pcrbot](https://github.com/pcrbot) 提供的源码支持
 
 ## License
 
 MIT
-
 您可以自由使用本项目的代码用于商业或非商业的用途，但必须附带 MIT 授权协议。
