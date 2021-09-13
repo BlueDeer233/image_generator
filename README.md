@@ -4,7 +4,7 @@
 
 ## 使用方法
 1. 将该项目放在HoshinoBot插件目录 `modules` 下，或者clone本项目 `git clone https://github.com/BlueDeer233/image_generator.git`  
-2. pip以下依赖：`pillow`  `aiohttp`  
+2. pip以下依赖：`pillow`  
 3. 在`config/__bot__.py`模块列表中添加 `image_generator`  
 4. 重启HoshinoBot  
 
