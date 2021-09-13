@@ -1,6 +1,6 @@
 # 生草图片生成器
 
-适用hoshino，集成[5000choyen](https://github.com/pcrbot/5000choyen)、[千雪bot](https://github.com/Diving-Fish/Chiyuki-Bot)图片生成器的图片生成器插件
+适用hoshino，集成[5000choyen](https://github.com/pcrbot/5000choyen)、[千雪bot](https://github.com/Diving-Fish/Chiyuki-Bot)图片生成器和附加一些功能的图片生成器插件
 
 ## 使用方法
 1. 将该项目放在HoshinoBot插件目录 `modules` 下，或者clone本项目 `git clone https://github.com/BlueDeer233/image_generator.git`  
