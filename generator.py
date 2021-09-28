@@ -19,7 +19,6 @@ def get_gradient_2d(start, stop, width, height, is_horizontal=False):
 
 
 def getTextWidth(text, font, width=100, height=500, recursive=False):
-    print(text)
     step = 100
     img = Image.new("L", (width, height))
     draw = ImageDraw.Draw(img)
