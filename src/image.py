@@ -80,31 +80,15 @@ def head_detect_cv(img: Image):
     return concat_head_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(24, 24))
 
 
-async def head_detect_yolo(img: Image):
-    cvimg = img_to_cvimg(img)
-    image_base64 = cvimg_to_base64(cvimg)
-    resp = await aiorequests.post('http://10.8.14.221:2334/anime_head_detect', json={'image': image_base64})
-    if resp is not None and resp.status_code == 200:
-        res = await resp.json()
-        if 'result' in res:
-            return res['result']
-    return None
-
-
 async def concat_head_(img: Image):
     loop = asyncio.get_event_loop()
     executor = ThreadPoolExecutor()
 
-    top_shift_scale = 0.25
-    x_scale = 0.15
-    faces = await head_detect_yolo(img)
-    if faces is not None and len(faces) > 0:
-        faces = await loop.run_in_executor(executor, head_detect_cv, img)
-        if not len(faces):
-            return Image.open(path.join(path.dirname(__file__), "../images/head/没找到头.png"))
-        else:
-            top_shift_scale = 0.45
-            x_scale = 0.25
+    top_shift_scale = 0.45
+    x_scale = 0.25
+    faces = await loop.run_in_executor(executor, head_detect_cv, img)
+    if not len(faces):
+        return Image.open(path.join(path.dirname(__file__), "../images/head/没找到头.png"))
     img = img.convert("RGBA")
 
     for (x, y, w, h) in faces:
