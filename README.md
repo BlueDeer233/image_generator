@@ -18,7 +18,7 @@
 接头 <图片>  
 real接头 <图片>  
 @bot 隐藏图片  
-
+ps：隐藏图片 发送彩图进图彩图模式
 ## 鸣谢
 
 感谢 [kosakarin](https://github.com/kosakarin/hide_img) 提供的源码支持  
