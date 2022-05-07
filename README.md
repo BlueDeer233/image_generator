@@ -21,6 +21,7 @@ real接头 <图片>
 ps：隐藏图片 发送彩图进图彩图模式
 ## 鸣谢
 
+感谢 [leinlin](https://zhuanlan.zhihu.com/p/32532733) 提供的彩图幻影坦克教程
 感谢 [kosakarin](https://github.com/kosakarin/hide_img) 提供的源码支持  
 感谢 [shebot](https://github.com/pcrbot/plugins-for-Hoshino) 提供的源码支持  
 感谢 [Diving-Fish](https://github.com/Diving-Fish/Chiyuki-Bot) 提供的源码支持  
