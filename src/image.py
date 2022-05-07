@@ -166,3 +166,63 @@ def make_hide_image(up_img, hide_img):
             out.putpixel((i, k), (R, R, R, a))  # 将用于输出的图片每个像素点处理成需要的颜色和透明度
 
     return out
+
+
+def make_hide_image_color(up_img, hide_img):
+    max_size = (max(up_img.size[0], hide_img.size[0]), 0)
+
+    up_img = up_img.resize((max_size[0], int(up_img.size[1] * (max_size[0] / up_img.size[0]))), Image.ANTIALIAS)
+    hide_img = hide_img.resize((max_size[0], int(hide_img.size[1] * (max_size[0] / hide_img.size[0]))), Image.ANTIALIAS)
+
+    max_size = (max_size[0], max(up_img.size[1], hide_img.size[1]))
+
+    if hide_img.size[1] == up_img.size[1]:  # 大小相等直接转为灰度图片
+        up_img = up_img.convert('RGBA')
+        hide_img = hide_img.convert('RGBA')
+    elif max_size[1] == hide_img.size[1]:  # 这两个elif都是对图片进行大小补全后再转为灰度图片
+        up_img_temp = Image.new('RGBA', (max_size), (255, 255, 255, 255))
+        up_img_temp.paste(up_img, (0, (max_size[1] - up_img.size[1]) // 2))
+        up_img = up_img_temp.copy()
+        hide_img = hide_img.convert('RGBA')
+    elif max_size[1] == up_img.size[1]:
+        hide_img_temp = Image.new('RGBA', (max_size), (0, 0, 0, 255))
+        hide_img_temp.paste(hide_img, (0, (max_size[1] - hide_img.size[1]) // 2))
+        up_img = up_img.convert('RGBA')
+        hide_img = hide_img_temp.copy()
+
+    m_lightWhite, m_lightBlack = 1.0, 0.2
+    m_colorWhite, m_colorBlack = 0.5, 0.7
+    out = Image.new('RGBA', (max_size), (255, 255, 255, 255))
+    for i in range(up_img.size[0]):
+        for k in range(up_img.size[1]):
+            r1, g1, b1, _ = up_img.getpixel((i, k))
+            r1, g1, b1, = int(r1 * m_lightWhite), int(g1 * m_lightWhite), int(b1 * m_lightWhite)
+            gray1 = min(int(r1 * 0.334 + g1 * 0.333 + b1 * 0.333), 255)
+            r1 = r1 * m_colorWhite + gray1 * (1 - m_colorWhite)
+            g1 = g1 * m_colorWhite + gray1 * (1 - m_colorWhite)
+            b1 = b1 * m_colorWhite + gray1 * (1 - m_colorWhite)
+            # gray1 = min(int(r1 * 0.334 + g1 * 0.333 + b1 * 0.333), 255)
+
+            r2, g2, b2, _ = hide_img.getpixel((i, k))
+            r2, g2, b2, = int(r2 * m_lightBlack), int(g2 * m_lightBlack), int(b2 * m_lightBlack)
+            gray2 = min(int(r2 * 0.334 + g2 * 0.333 + b2 * 0.333), 255)
+            r2 = r2 * m_colorBlack + gray2 * (1 - m_colorBlack)
+            g2 = g2 * m_colorBlack + gray2 * (1 - m_colorBlack)
+            b2 = b2 * m_colorBlack + gray2 * (1 - m_colorBlack)
+            # gray2 = min(int(r2 * 0.334 + g2 * 0.333 + b2 * 0.333), 255)
+
+            dr = 255 - r1 + r2
+            dg = 255 - g1 + g2
+            db = 255 - b1 + b2
+
+            maxc = max(max(r2, g2), b2)
+            a = min(max(int(dr * 0.222 + dg * 0.707 + db * 0.071), int(maxc)), 255)
+            a = max(a, 1)
+
+            r = min(int(r2 / a * 255), 255)
+            g = min(int(g2 / a * 255), 255)
+            b = min(int(b2 / a * 255), 255)
+
+            out.putpixel((i, k), (r, g, b, a))
+
+    return out

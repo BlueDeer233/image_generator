@@ -8,7 +8,7 @@ from hoshino.typing import HoshinoBot, CQEvent, MessageSegment, CommandSession
 from hoshino.util import FreqLimiter, DailyNumberLimiter, pic2b64
 
 from .src.generator import genImage
-from .src.image import high_eq_path, draw_text, get_jl, concat_head_, concat_head_real_, make_hide_image
+from .src.image import high_eq_path, draw_text, get_jl, concat_head_, concat_head_real_, make_hide_image, make_hide_image_color
 from .src.utils import save_img, get_all_img_url
 from hoshino.modules.image_generator.src.utils import get_image
 
@@ -140,32 +140,51 @@ async def concat_head(bot: HoshinoBot, ev: CQEvent):
         await bot.send(ev, '未检测到图片信息', at_sender=True)
 
 
-img = []
-send_times = 0
+img = {}
+send_times = {}
+color_flag = {}
 @sv.on_command('hide_image', only_to_me=True, aliases=['隐藏图片'])
 async def hide_image(session: CommandSession):
     global img
     global send_times
     await session.aget('', prompt='发送要上传的图片,暂不支持gif')
-    image = await save_img(get_all_img_url(session.ctx))
+    event = session.ctx
+    uid = event['user_id']
+    msg = event.message.extract_plain_text().strip()
+    if uid not in img:
+        img[uid] = []
+    if uid not in send_times:
+        send_times[uid] = 0
+    if uid not in color_flag:
+        color_flag[uid] = False
+    if '彩' in msg:
+        color_flag[uid] = True
+        await session.send('切换为彩图模式')
+
+    image = await save_img(get_all_img_url(event))
     if image:
-        img.extend(image)
+        img[uid].extend(image)
     else:
-        send_times += 1
-    if send_times >= 3:
-        await session.send('过多次未发送图片，已自动停止')
-        img = []
-        send_times = 0
-        return
-    if len(img) == 0:
+        send_times[uid] += 1
+    if send_times[uid] >= 3:
+        await session.finish('过多次未发送图片，已自动停止')
+        img[uid] = []
+        send_times[uid] = 0
+
+    if len(img[uid]) == 0:
         session.pause('请上传第一张图片')
-    elif len(img) == 1:
+    elif len(img[uid]) == 1:
         session.pause('请上传第二张图片')
-    elif len(img) == 2:
+    elif len(img[uid]) >= 2:
         await session.send('正在合成图片，请稍后')
         loop = asyncio.get_event_loop()
         executor = ThreadPoolExecutor()
-        res_img = await loop.run_in_executor(executor, make_hide_image, img[0], img[1])
+        if color_flag[uid]:
+            res_img = await loop.run_in_executor(executor, make_hide_image_color, img[uid][0], img[uid][1])
+        else:
+            res_img = await loop.run_in_executor(executor, make_hide_image, img[uid][0], img[uid][1])
         msg = str(MessageSegment.image(pic2b64(res_img)))
-        img = []
+        img[uid] = []
+        send_times[uid] = 0
+        color_flag[uid] = False
         await session.finish(msg)
