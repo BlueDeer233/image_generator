@@ -21,7 +21,10 @@ def img_to_cvimg(img: Image):
 
 
 def cvimg_to_img(cvimg: np.ndarray):
-    return Image.fromarray(cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB))
+    if cvimg.shape[-1] == 4:
+        return Image.fromarray(cv2.cvtColor(cvimg, cv2.COLOR_BGRA2RGBA))
+    else:
+        return Image.fromarray(cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB))
 
 
 def cvimg_to_base64(image_np):

@@ -2,6 +2,7 @@ import re
 import cv2
 import aiohttp
 import asyncio
+import numpy as np
 from os import path
 from io import BytesIO
 from random import randint
@@ -9,7 +10,7 @@ from PIL import Image, ImageFont, ImageDraw
 from hoshino import aiorequests
 from concurrent.futures import ThreadPoolExecutor
 
-from .utils import img_to_cvimg, cvimg_to_base64, img_to_base64
+from .utils import img_to_cvimg, cvimg_to_img, cvimg_to_base64, img_to_base64
 from .head_source import detect_face, gen_head, concat
 
 high_eq_path = path.join(path.dirname(__file__), '../images/high_eq_image.png')
@@ -134,95 +135,81 @@ async def concat_head_real_(img: Image):
 
 
 def make_hide_image(up_img, hide_img):
-    # 先获取两张图片中宽度较大的宽度
-    max_size = (max(up_img.size[0], hide_img.size[0]), 0)
-    # 将图片依据较大的宽度等比例处理
-    up_img = up_img.resize((max_size[0], int(up_img.size[1] * (max_size[0] / up_img.size[0]))), Image.ANTIALIAS)
-    hide_img = hide_img.resize((max_size[0], int(hide_img.size[1] * (max_size[0] / hide_img.size[0]))), Image.ANTIALIAS)
-    # 获取处理后生成图片的大小
-    max_size = (max_size[0], max(up_img.size[1], hide_img.size[1]))
+    up_img = img_to_cvimg(up_img)
+    hide_img = img_to_cvimg(hide_img)
 
-    if hide_img.size[1] == up_img.size[1]:  # 大小相等直接转为灰度图片
-        up_img = up_img.convert('L')
-        hide_img = hide_img.convert('L')
-    elif max_size[1] == hide_img.size[1]:  # 这两个elif都是对图片进行大小补全后再转为灰度图片
-        up_img_temp = Image.new('RGBA', (max_size), (255, 255, 255, 255))
-        up_img_temp.paste(up_img, (0, (max_size[1] - up_img.size[1]) // 2))
-        up_img = up_img_temp.convert('L')
-        hide_img = hide_img.convert('L')
-    elif max_size[1] == up_img.size[1]:
-        hide_img_temp = Image.new('RGBA', (max_size), (0, 0, 0, 255))
-        hide_img_temp.paste(hide_img, (0, (max_size[1] - hide_img.size[1]) // 2))
-        up_img = up_img.convert('L')
-        hide_img = hide_img_temp.convert('L')
+    max_size = (0, max(up_img.shape[1], hide_img.shape[1]))
+    up_img = cv2.resize(up_img, (max_size[1], int(up_img.shape[0] * (max_size[1] / up_img.shape[1]))))
+    hide_img = cv2.resize(hide_img, (max_size[1], int(hide_img.shape[0] * (max_size[1] / hide_img.shape[1]))))
+    max_size = (max(up_img.shape[0], hide_img.shape[0]), max_size[1])
 
-    out = Image.new('RGBA', (max_size), (255, 255, 255, 255))  # 生成一个空的用于输出的图片
-    for i in range(up_img.size[0]):
-        for k in range(up_img.size[1]):  # 遍历读取每一个像素点
-            La = (up_img.getpixel((i, k)) / 512) + 0.5  # 512是256*2，采用256是为了避免La-Lb=1的情况，而且基本不会损失图片信息
-            Lb = hide_img.getpixel((i, k)) / 512  # a/2 +0.5是为了区分明部和暗部，这样明部都在[0.5,1),暗部都在[0,0.5)，互不干扰
-            R = int((255 * Lb) / (1 - (La - Lb)))
-            a = int((1 - (La - Lb)) * 255)  # 这里是套用公式 公式可以见b站专栏 隐藏图原理(https://www.bilibili.com/read/cv9474134/)
-            out.putpixel((i, k), (R, R, R, a))  # 将用于输出的图片每个像素点处理成需要的颜色和透明度
+    if hide_img.shape[0] == up_img.shape[0]:
+        pass
+    elif max_size[0] == hide_img.shape[0]:
+        up_img_temp = np.ones((*max_size, 3), dtype=np.float32)
+        x = (max_size[0] - up_img.shape[0]) // 2
+        up_img_temp[x:x + up_img.shape[0], :, :] = up_img
+        up_img = up_img_temp.copy()
+    elif max_size[0] == up_img.shape[0]:
+        hide_img_temp = np.zeros((*max_size, 3), dtype=np.float32)
+        x = (max_size[0] - hide_img.shape[0]) // 2
+        hide_img_temp[x:x + hide_img.shape[0], :, :] = hide_img
+        hide_img = hide_img_temp.copy()
 
-    return out
+    up_img = cv2.cvtColor(up_img, cv2.COLOR_BGR2GRAY)
+    hide_img = cv2.cvtColor(hide_img, cv2.COLOR_BGR2GRAY)
+
+    imgLa = up_img.astype(np.float32) / 512 + 0.5
+    imgLb = hide_img.astype(np.float32) / 512
+
+    R = 255 * imgLb / (1 - (imgLa - imgLb))
+    a = (1 - (imgLa - imgLb)) * 255
+    out = cv2.merge((R, R, R, a))
+
+    return cvimg_to_img(out.astype(np.uint8))
 
 
 def make_hide_image_color(up_img, hide_img):
-    max_size = (max(up_img.size[0], hide_img.size[0]), 0)
+    up_img = img_to_cvimg(up_img)
+    hide_img = img_to_cvimg(hide_img)
 
-    up_img = up_img.resize((max_size[0], int(up_img.size[1] * (max_size[0] / up_img.size[0]))), Image.ANTIALIAS)
-    hide_img = hide_img.resize((max_size[0], int(hide_img.size[1] * (max_size[0] / hide_img.size[0]))), Image.ANTIALIAS)
+    max_size = (0, max(up_img.shape[1], hide_img.shape[1]))
+    up_img = cv2.resize(up_img, (max_size[1], int(up_img.shape[0] * (max_size[1] / up_img.shape[1]))))
+    hide_img = cv2.resize(hide_img, (max_size[1], int(hide_img.shape[0] * (max_size[1] / hide_img.shape[1]))))
+    max_size = (max(up_img.shape[0], hide_img.shape[0]), max_size[1])
 
-    max_size = (max_size[0], max(up_img.size[1], hide_img.size[1]))
+    up_img = up_img.astype(np.float32) / 255
+    hide_img = hide_img.astype(np.float32) / 255
 
-    if hide_img.size[1] == up_img.size[1]:  # 大小相等直接转为灰度图片
-        up_img = up_img.convert('RGBA')
-        hide_img = hide_img.convert('RGBA')
-    elif max_size[1] == hide_img.size[1]:  # 这两个elif都是对图片进行大小补全后再转为灰度图片
-        up_img_temp = Image.new('RGBA', (max_size), (255, 255, 255, 255))
-        up_img_temp.paste(up_img, (0, (max_size[1] - up_img.size[1]) // 2))
+    if hide_img.shape[0] == up_img.shape[0]:
+        pass
+    elif max_size[0] == hide_img.shape[0]:
+        up_img_temp = np.ones((*max_size, 3), dtype=np.float32)
+        x = (max_size[0] - up_img.shape[0]) // 2
+        up_img_temp[x:x + up_img.shape[0], :, :] = up_img
         up_img = up_img_temp.copy()
-        hide_img = hide_img.convert('RGBA')
-    elif max_size[1] == up_img.size[1]:
-        hide_img_temp = Image.new('RGBA', (max_size), (0, 0, 0, 255))
-        hide_img_temp.paste(hide_img, (0, (max_size[1] - hide_img.size[1]) // 2))
-        up_img = up_img.convert('RGBA')
+    elif max_size[0] == up_img.shape[0]:
+        hide_img_temp = np.zeros((*max_size, 3), dtype=np.float32)
+        x = (max_size[0] - hide_img.shape[0]) // 2
+        hide_img_temp[x:x + hide_img.shape[0], :, :] = hide_img
         hide_img = hide_img_temp.copy()
 
     m_lightWhite, m_lightBlack = 1.0, 0.2
     m_colorWhite, m_colorBlack = 0.5, 0.7
-    out = Image.new('RGBA', (max_size), (255, 255, 255, 255))
-    for i in range(up_img.size[0]):
-        for k in range(up_img.size[1]):
-            r1, g1, b1, _ = up_img.getpixel((i, k))
-            r1, g1, b1, = int(r1 * m_lightWhite), int(g1 * m_lightWhite), int(b1 * m_lightWhite)
-            gray1 = min(int(r1 * 0.334 + g1 * 0.333 + b1 * 0.333), 255)
-            r1 = r1 * m_colorWhite + gray1 * (1 - m_colorWhite)
-            g1 = g1 * m_colorWhite + gray1 * (1 - m_colorWhite)
-            b1 = b1 * m_colorWhite + gray1 * (1 - m_colorWhite)
-            # gray1 = min(int(r1 * 0.334 + g1 * 0.333 + b1 * 0.333), 255)
+    up_img = up_img * m_lightWhite
+    hide_img = hide_img * m_lightBlack
+    gray1 = cv2.cvtColor(up_img, cv2.COLOR_BGR2GRAY)
+    gray1 = cv2.cvtColor(gray1, cv2.COLOR_GRAY2BGR)
+    img1 = up_img * m_colorWhite + gray1 * (1 - m_colorWhite)
+    gray2 = cv2.cvtColor(hide_img, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(gray2, cv2.COLOR_GRAY2BGR)
+    img2 = hide_img * m_colorBlack + gray2 * (1 - m_colorBlack)
+    imgd = 1 - img1 + img2
+    maxc = np.max(hide_img, axis=2)
+    a = cv2.cvtColor(imgd, cv2.COLOR_BGR2GRAY)
+    a = np.clip(a, maxc, 1)
+    a_c = cv2.cvtColor(a, cv2.COLOR_GRAY2BGR)
+    out = np.clip(hide_img / a_c, 0, 1)
+    out = cv2.merge((*cv2.split(out), a)) * 255
 
-            r2, g2, b2, _ = hide_img.getpixel((i, k))
-            r2, g2, b2, = int(r2 * m_lightBlack), int(g2 * m_lightBlack), int(b2 * m_lightBlack)
-            gray2 = min(int(r2 * 0.334 + g2 * 0.333 + b2 * 0.333), 255)
-            r2 = r2 * m_colorBlack + gray2 * (1 - m_colorBlack)
-            g2 = g2 * m_colorBlack + gray2 * (1 - m_colorBlack)
-            b2 = b2 * m_colorBlack + gray2 * (1 - m_colorBlack)
-            # gray2 = min(int(r2 * 0.334 + g2 * 0.333 + b2 * 0.333), 255)
-
-            dr = 255 - r1 + r2
-            dg = 255 - g1 + g2
-            db = 255 - b1 + b2
-
-            maxc = max(max(r2, g2), b2)
-            a = min(max(int(dr * 0.222 + dg * 0.707 + db * 0.071), int(maxc)), 255)
-            a = max(a, 1)
-
-            r = min(int(r2 / a * 255), 255)
-            g = min(int(g2 / a * 255), 255)
-            b = min(int(b2 / a * 255), 255)
-
-            out.putpixel((i, k), (r, g, b, a))
-
-    return out
+    return cvimg_to_img(out.astype(np.uint8))
